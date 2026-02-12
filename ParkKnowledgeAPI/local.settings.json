@@ -8,6 +8,7 @@
         "DeepSeek__ModelId": "deepseek-chat",
         "Qdrant__Host": "localhost",
         "Qdrant__Port": "6333",
-        "Qdrant__GrpcPort": "6334"
+        "Qdrant__GrpcPort": "6334",
+        "NPS__ApiKey": "REMOVED_KEY"
     }
 }
