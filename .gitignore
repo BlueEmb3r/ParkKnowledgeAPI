@@ -1,0 +1,8 @@
+.vscode
+.env
+
+# ONNX model files (large binaries)
+*.onnx
+
+# Docker
+qdrant_storage/
