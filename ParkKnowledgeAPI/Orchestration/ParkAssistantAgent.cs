@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -38,31 +39,7 @@ public class ParkAssistantAgent
     {
         _logger.LogInformation("Agent processing question: {Question}", question);
 
-        // Clone to avoid cross-request plugin pollution, then add MCP tools
-        var kernel = _kernel.Clone();
-        if (_mcpParkServer.Tools.Count > 0)
-        {
-            kernel.Plugins.AddFromFunctions("ParkTools",
-                _mcpParkServer.Tools.Select(t => t.AsKernelFunction()));
-            _logger.LogInformation("Imported {Count} MCP tools into kernel", _mcpParkServer.Tools.Count);
-        }
-
-        // Log MCP tool calls and results from the request path
-        kernel.FunctionInvocationFilters.Add(new ToolInvocationLogger(_logger));
-
-        ChatCompletionAgent agent = new()
-        {
-            Name = "ParkAssistant",
-            Instructions = Instructions,
-            Kernel = kernel,
-            Arguments = new KernelArguments(new OpenAIPromptExecutionSettings
-            {
-                Temperature = 0.0,
-                // Forces DeepSeek to call search_parks before answering (RAG)
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Required()
-            })
-        };
-
+        var agent = BuildAgent();
         var response = new StringBuilder();
 
         await foreach (var message in agent.InvokeAsync(
@@ -73,6 +50,54 @@ public class ParkAssistantAgent
 
         _logger.LogInformation("Agent completed response");
         return response.ToString();
+    }
+
+    public async IAsyncEnumerable<string> AskStreamingAsync(
+        string question,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Agent processing question (streaming): {Question}", question);
+
+        var agent = BuildAgent();
+
+        await foreach (StreamingChatMessageContent chunk in agent.InvokeStreamingAsync(
+            new ChatMessageContent(AuthorRole.User, question),
+            cancellationToken: cancellationToken))
+        {
+            if (!string.IsNullOrEmpty(chunk.Content))
+                yield return chunk.Content;
+        }
+
+        _logger.LogInformation("Agent completed streaming response");
+    }
+
+    /// <summary>
+    /// Creates a configured ChatCompletionAgent with a cloned kernel, MCP tools, and logging filter.
+    /// Cloning prevents cross-request plugin pollution.
+    /// </summary>
+    private ChatCompletionAgent BuildAgent()
+    {
+        var kernel = _kernel.Clone();
+        if (_mcpParkServer.Tools.Count > 0)
+        {
+            kernel.Plugins.AddFromFunctions("ParkTools",
+                _mcpParkServer.Tools.Select(t => t.AsKernelFunction()));
+            _logger.LogInformation("Imported {Count} MCP tools into kernel", _mcpParkServer.Tools.Count);
+        }
+
+        kernel.FunctionInvocationFilters.Add(new ToolInvocationLogger(_logger));
+
+        return new ChatCompletionAgent
+        {
+            Name = "ParkAssistant",
+            Instructions = Instructions,
+            Kernel = kernel,
+            Arguments = new KernelArguments(new OpenAIPromptExecutionSettings
+            {
+                Temperature = 0.0,
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Required()
+            })
+        };
     }
 
     /// <summary>Logs MCP tool calls and results in the request context where ILogger output is visible.</summary>
