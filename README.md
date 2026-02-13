@@ -70,6 +70,27 @@ Descriptions are the most **semantically meaningful** section for similarity sea
 
 `Microsoft.SemanticKernel.Connectors.Onnx` provides `BertOnnxTextEmbeddingGenerationService` which handles tokenization, ONNX inference, mean pooling, and L2 normalization internally. Wrapping it in a custom `IEmbeddingService` would add indirection with no benefit — the SK `IEmbeddingGenerator<string, Embedding<float>>` interface is injected directly where needed.
 
+### Streaming endpoint (`/api/ask/stream`)
+
+`POST /api/ask` buffers the full LLM response before returning JSON — the client gets nothing until all tool calls and generation are complete. `/api/ask/stream` uses Server-Sent Events to deliver tokens as they arrive, cutting time-to-first-token and enabling real-time UI rendering.
+
+**Wire format** follows the OpenAI SSE convention:
+```
+Content-Type: text/event-stream; charset=utf-8
+
+data: {"content":"Hello"}
+
+data: {"content":" world"}
+
+data: [DONE]
+```
+
+**Why it's structured this way:**
+- `ParkAssistantAgent.BuildAgent()` is shared between `AskAsync` and `AskStreamingAsync` — kernel cloning, MCP tool injection, and agent construction live in one place.
+- The orchestration layer returns `IAsyncEnumerable<string>`, keeping SSE/HTTP concerns out of business logic.
+- The function writes directly to `HttpResponse` (returns `Task`, not `IActionResult`) because once streaming headers are sent, the status code is committed and can't change via an action result.
+- Errors mid-stream are sent as an SSE error event (`data: {"error":"..."}`) followed by `data: [DONE]`, since the 200 status is already on the wire.
+
 ## Scalability Considerations
 
 - **Azure Functions** scale horizontally by default — each instance loads its own ONNX model in-process, so embedding throughput scales linearly with instance count. The Kernel and agent are registered as Transient to avoid cross-request state issues under concurrency.
