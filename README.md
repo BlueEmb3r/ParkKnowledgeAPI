@@ -54,6 +54,22 @@ ParkKnowledgeAPI/
 docker-compose.yml     # Qdrant vector database
 ```
 
+## Design Decisions
+
+### One vector per park, no chunking
+
+The embedding model (all-MiniLM-L6-v2) has a 256-token context window. We only embed the **Description** section of each park file, which is 36-67 words across the dataset -- well within that limit. There is no text to split, so chunking and overlap logic would be dead code.
+
+The full file content (directions, weather, hours) is stored as payload in Qdrant and returned to the LLM at query time, so no information is lost.
+
+### Embed description, store everything
+
+Descriptions are the most **semantically meaningful** section for similarity search — a user asking "parks with glaciers" should match on description content, not driving directions or weather. Embedding the full file would dilute the signal with boilerplate (operating hours, route numbers) that adds noise to cosine similarity.
+
+### No custom embedding wrapper
+
+`Microsoft.SemanticKernel.Connectors.Onnx` provides `BertOnnxTextEmbeddingGenerationService` which handles tokenization, ONNX inference, mean pooling, and L2 normalization internally. Wrapping it in a custom `IEmbeddingService` would add indirection with no benefit — the SK `IEmbeddingGenerator<string, Embedding<float>>` interface is injected directly where needed.
+
 ## Key Dependencies
 
 | Package | Purpose |
