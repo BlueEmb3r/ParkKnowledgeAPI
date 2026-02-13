@@ -10,6 +10,12 @@ dotnet build
 func start
 ```
 
+Ensure Qdrant is running (needed for `/ingest`):
+
+```bash
+docker compose up -d
+```
+
 The API will be available at `http://localhost:7071/api/`.
 
 ## POST /ask
@@ -33,3 +39,30 @@ curl.exe -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/
 ```
 
 Expected: `{"error":"Question is required."}`
+
+## POST /ingest
+
+**Ingest all parks from local files (no body):**
+```bash
+curl -s -X POST http://localhost:7071/api/ingest
+```
+
+```powershell
+curl.exe -s -X POST http://localhost:7071/api/ingest
+```
+
+Expected: `{"message":"Successfully ingested 474 parks.","count":474}`
+
+**Ingest specific documents (with body):**
+```bash
+curl -s -X POST http://localhost:7071/api/ingest -H "Content-Type: application/json" -d "{\"documents\": [{\"fileName\": \"test.txt\", \"content\": \"Test Park\nState(s): CA\n\nDescription:\nA test park for verification.\n\nDirections:\nNone.\"}]}"
+```
+
+```powershell
+curl.exe -s -X POST http://localhost:7071/api/ingest -H "Content-Type: application/json" -d '{"documents": [{"fileName": "test.txt", "content": "Test Park\nState(s): CA\n\nDescription:\nA test park for verification.\n\nDirections:\nNone."}]}'
+```
+
+Expected: `{"message":"Successfully ingested 1 parks.","count":1}`
+
+**Verify in Qdrant dashboard:**
+Open `http://localhost:6333/dashboard` and check the `parks` collection has points.

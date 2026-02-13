@@ -2,7 +2,7 @@
   "profiles": {
     "ParkKnowledgeAPI": {
       "commandName": "Project",
-      "commandLineArgs": "--port 7008",
+      "commandLineArgs": "",
       "launchBrowser": false
     }
   }

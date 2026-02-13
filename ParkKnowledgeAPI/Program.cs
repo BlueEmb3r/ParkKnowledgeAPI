@@ -3,9 +3,14 @@ using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Connectors.Onnx;
 using ParkKnowledgeAPI.Orchestration;
+using ParkKnowledgeAPI.Services;
+using ParkKnowledgeAPI.Services.Interfaces;
+using Qdrant.Client;
 
 #pragma warning disable SKEXP0010 // OpenAI custom endpoint (DeepSeek)
+#pragma warning disable SKEXP0070 // ONNX connector
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -20,6 +25,17 @@ builder.Services.AddOpenAIChatCompletion(
     modelId: builder.Configuration["DeepSeek:ModelId"] ?? "deepseek-chat",
     apiKey: builder.Configuration["DeepSeek:ApiKey"] ?? "",
     endpoint: new Uri(builder.Configuration["DeepSeek:Endpoint"] ?? "https://api.deepseek.com"));
+
+// ONNX embedding model (all-MiniLM-L6-v2, 384 dims)
+var onnxModelPath = Path.Combine(AppContext.BaseDirectory, "Models", "onnx", "model.onnx");
+var vocabPath = Path.Combine(AppContext.BaseDirectory, "Models", "onnx", "vocab.txt");
+builder.Services.AddBertOnnxEmbeddingGenerator(onnxModelPath, vocabPath);
+
+// Qdrant client
+builder.Services.AddSingleton(new QdrantClient("localhost", 6334));
+
+// Vector store
+builder.Services.AddSingleton<IVectorStoreService, QdrantVectorStoreService>();
 
 // Kernel is transient — lightweight wrapper, avoids cross-request mutation
 builder.Services.AddTransient<Kernel>(sp => new Kernel(sp));
