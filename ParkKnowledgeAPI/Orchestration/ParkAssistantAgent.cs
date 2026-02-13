@@ -13,7 +13,7 @@ using ParkKnowledgeAPI.Mcp;
 
 namespace ParkKnowledgeAPI.Orchestration;
 
-public class ParkAssistantAgent
+public class ParkAssistantAgent : IParkAssistantAgent
 {
     private readonly Kernel _kernel;
     private readonly McpParkServer _mcpParkServer;

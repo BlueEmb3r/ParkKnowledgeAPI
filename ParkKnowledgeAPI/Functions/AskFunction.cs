@@ -9,10 +9,10 @@ namespace ParkKnowledgeAPI.Functions;
 
 public class AskFunction
 {
-    private readonly ParkAssistantAgent _agent;
+    private readonly IParkAssistantAgent _agent;
     private readonly ILogger<AskFunction> _logger;
 
-    public AskFunction(ParkAssistantAgent agent, ILogger<AskFunction> logger)
+    public AskFunction(IParkAssistantAgent agent, ILogger<AskFunction> logger)
     {
         _agent = agent;
         _logger = logger;

@@ -49,6 +49,6 @@ builder.Services.AddSingleton<McpParkServer>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<McpParkServer>());
 
 // Orchestration
-builder.Services.AddTransient<ParkAssistantAgent>();
+builder.Services.AddTransient<IParkAssistantAgent, ParkAssistantAgent>();
 
 builder.Build().Run();

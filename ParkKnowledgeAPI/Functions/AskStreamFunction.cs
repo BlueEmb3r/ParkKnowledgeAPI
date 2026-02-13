@@ -9,10 +9,10 @@ namespace ParkKnowledgeAPI.Functions;
 
 public class AskStreamFunction
 {
-    private readonly ParkAssistantAgent _agent;
+    private readonly IParkAssistantAgent _agent;
     private readonly ILogger<AskStreamFunction> _logger;
 
-    public AskStreamFunction(ParkAssistantAgent agent, ILogger<AskStreamFunction> logger)
+    public AskStreamFunction(IParkAssistantAgent agent, ILogger<AskStreamFunction> logger)
     {
         _agent = agent;
         _logger = logger;

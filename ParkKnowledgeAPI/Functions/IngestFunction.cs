@@ -144,7 +144,7 @@ public class IngestFunction
         return documents;
     }
 
-    private static string ExtractDescription(string content)
+    internal static string ExtractDescription(string content)
     {
         const string descriptionHeader = "Description:";
 

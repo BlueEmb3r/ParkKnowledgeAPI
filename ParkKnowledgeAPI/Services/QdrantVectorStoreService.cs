@@ -82,7 +82,7 @@ public class QdrantVectorStoreService : IVectorStoreService
         )).ToList();
     }
 
-    private static Guid GenerateDeterministicGuid(string input)
+    internal static Guid GenerateDeterministicGuid(string input)
     {
         var bytes = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(input));
         return new Guid(bytes);
