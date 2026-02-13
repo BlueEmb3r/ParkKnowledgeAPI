@@ -3,26 +3,33 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using ParkKnowledgeAPI.Mcp;
 
-#pragma warning disable SKEXP0010
-#pragma warning disable SKEXP0110
+#pragma warning disable SKEXP0001 // AsKernelFunction() on AIFunction
+#pragma warning disable SKEXP0010 // OpenAI custom endpoint (DeepSeek)
+#pragma warning disable SKEXP0110 // ChatCompletionAgent
 
 namespace ParkKnowledgeAPI.Orchestration;
 
 public class ParkAssistantAgent
 {
     private readonly Kernel _kernel;
+    private readonly McpParkServer _mcpParkServer;
     private readonly ILogger<ParkAssistantAgent> _logger;
 
     private const string Instructions = """
         You are a knowledgeable national park assistant.
         Answer questions about US national parks accurately and concisely.
-        If you don't know the answer, say so honestly.
+
+        IMPORTANT: Always use the search_parks tool to find relevant park information
+        before answering questions. Base your answers on the search results.
+        If the search returns no relevant results, say so honestly.
         """;
 
-    public ParkAssistantAgent(Kernel kernel, ILogger<ParkAssistantAgent> logger)
+    public ParkAssistantAgent(Kernel kernel, McpParkServer mcpParkServer, ILogger<ParkAssistantAgent> logger)
     {
         _kernel = kernel;
+        _mcpParkServer = mcpParkServer;
         _logger = logger;
     }
 
@@ -30,14 +37,28 @@ public class ParkAssistantAgent
     {
         _logger.LogInformation("Agent processing question: {Question}", question);
 
+        // Clone to avoid cross-request plugin pollution, then add MCP tools
+        var kernel = _kernel.Clone();
+        if (_mcpParkServer.Tools.Count > 0)
+        {
+            kernel.Plugins.AddFromFunctions("ParkTools",
+                _mcpParkServer.Tools.Select(t => t.AsKernelFunction()));
+            _logger.LogInformation("Imported {Count} MCP tools into kernel", _mcpParkServer.Tools.Count);
+        }
+
+        // Log MCP tool calls and results from the request path
+        kernel.FunctionInvocationFilters.Add(new ToolInvocationLogger(_logger));
+
         ChatCompletionAgent agent = new()
         {
             Name = "ParkAssistant",
             Instructions = Instructions,
-            Kernel = _kernel,
+            Kernel = kernel,
             Arguments = new KernelArguments(new OpenAIPromptExecutionSettings
             {
                 Temperature = 0.0,
+                // Forces DeepSeek to call search_parks before answering (RAG)
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Required()
             })
         };
 
@@ -51,5 +72,22 @@ public class ParkAssistantAgent
 
         _logger.LogInformation("Agent completed response");
         return response;
+    }
+
+    /// <summary>Logs MCP tool calls and results in the request context where ILogger output is visible.</summary>
+    private sealed class ToolInvocationLogger(ILogger logger) : IFunctionInvocationFilter
+    {
+        public async Task OnFunctionInvocationAsync(FunctionInvocationContext context, Func<FunctionInvocationContext, Task> next)
+        {
+            var args = string.Join(", ", context.Arguments.Select(a => $"{a.Key}={a.Value}"));
+            logger.LogInformation("MCP tool {Tool} called with: {Args}", context.Function.Name, args);
+
+            await next(context);
+
+            var result = context.Result.ToString();
+            var preview = result.Length > 200 ? result[..200] + "..." : result;
+            logger.LogInformation("MCP tool {Tool} returned ({Length} chars): {Preview}",
+                context.Function.Name, result.Length, preview);
+        }
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using ParkKnowledgeAPI.Models;
 using ParkKnowledgeAPI.Services.Interfaces;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
@@ -57,6 +58,28 @@ public class QdrantVectorStoreService : IVectorStoreService
         await _client.UpsertAsync(CollectionName, points, cancellationToken: cancellationToken);
 
         _logger.LogInformation("Upserted {Count} points into '{Collection}'", points.Count, CollectionName);
+    }
+
+    /// <summary>Cosine similarity search against the parks collection in Qdrant.</summary>
+    public async Task<IReadOnlyList<ParkSearchResult>> SearchAsync(
+        ReadOnlyMemory<float> queryEmbedding,
+        int limit = 5,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await _client.SearchAsync(
+            CollectionName,
+            queryEmbedding.ToArray(),
+            limit: (ulong)limit,
+            cancellationToken: cancellationToken);
+
+        // Map Qdrant ScoredPoint payload fields back to our domain model
+        return results.Select(point => new ParkSearchResult(
+            ParkCode: point.Payload.TryGetValue("park_code", out var code) ? code.StringValue : "",
+            ParkName: point.Payload.TryGetValue("park_name", out var name) ? name.StringValue : "",
+            State: point.Payload.TryGetValue("state", out var state) ? state.StringValue : "",
+            Content: point.Payload.TryGetValue("content", out var content) ? content.StringValue : "",
+            Score: point.Score
+        )).ToList();
     }
 
     private static Guid GenerateDeterministicGuid(string input)

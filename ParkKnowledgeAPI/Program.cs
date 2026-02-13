@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Onnx;
+using ParkKnowledgeAPI.Mcp;
 using ParkKnowledgeAPI.Orchestration;
 using ParkKnowledgeAPI.Services;
 using ParkKnowledgeAPI.Services.Interfaces;
@@ -39,6 +40,11 @@ builder.Services.AddSingleton<IVectorStoreService, QdrantVectorStoreService>();
 
 // Kernel is transient — lightweight wrapper, avoids cross-request mutation
 builder.Services.AddTransient<Kernel>(sp => new Kernel(sp));
+
+// MCP server — singleton so the agent can inject it; hosted service so the
+// in-process server+client start/stop with the application lifecycle
+builder.Services.AddSingleton<McpParkServer>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<McpParkServer>());
 
 // Orchestration
 builder.Services.AddTransient<ParkAssistantAgent>();

@@ -45,7 +45,26 @@ When a module is down, `status` changes to `"degraded"` and the failing module s
 
 ## POST /ask
 
-**Success:**
+The ask endpoint uses RAG — it calls the `search_parks` MCP tool to query Qdrant before answering. **Ingest data first** (see `/ingest` below) for grounded responses.
+
+**RAG query (after ingesting):**
+```bash
+curl -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d "{\"question\": \"What can you tell me about Mount Rainier?\"}"
+```
+
+```powershell
+curl.exe -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d '{"question": "What can you tell me about Mount Rainier?"}'
+```
+
+Expected: Response should reference Mount Rainier National Park with specific details from the ingested data, such as:
+- It's an active volcano and the most glaciated peak in the contiguous US at 14,410 feet
+- Located in Washington state
+- Features subalpine wildflower meadows, ancient forests, and diverse wildlife
+- Feeds five major rivers
+- Park entrances include Nisqually (year-round), Carbon River, and White River
+- Peak season is July and August for wildflowers
+
+**General question:**
 ```bash
 curl -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d "{\"question\": \"What is Yellowstone known for?\"}"
 ```
