@@ -84,10 +84,17 @@ public class ParkAssistantAgent
 
             await next(context);
 
-            var result = context.Result.ToString();
-            var preview = result.Length > 200 ? result[..200] + "..." : result;
-            logger.LogInformation("MCP tool {Tool} returned ({Length} chars): {Preview}",
-                context.Function.Name, result.Length, preview);
+            var result = context.Result.ToString() ?? "";
+            var lines = result.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            // Each result block starts with "## ParkName ..." — count and extract those headers
+            var headers = lines.Where(l => l.StartsWith("## ")).ToList();
+            var count = headers.Count;
+
+            logger.LogInformation("MCP tool {Tool} returned {Count} results:", context.Function.Name, count);
+            foreach (var header in headers)
+            {
+                logger.LogInformation("  {Header}", header);
+            }
         }
     }
 }
