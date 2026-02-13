@@ -70,6 +70,14 @@ Descriptions are the most **semantically meaningful** section for similarity sea
 
 `Microsoft.SemanticKernel.Connectors.Onnx` provides `BertOnnxTextEmbeddingGenerationService` which handles tokenization, ONNX inference, mean pooling, and L2 normalization internally. Wrapping it in a custom `IEmbeddingService` would add indirection with no benefit — the SK `IEmbeddingGenerator<string, Embedding<float>>` interface is injected directly where needed.
 
+## Scalability Considerations
+
+- **Azure Functions** scale horizontally by default — each instance loads its own ONNX model in-process, so embedding throughput scales linearly with instance count. The Kernel and agent are registered as Transient to avoid cross-request state issues under concurrency.
+- **Qdrant** supports sharding and replication for production workloads. The current single-node Docker setup is suitable for the 474-park dataset; for millions of vectors, Qdrant's distributed mode partitions data across nodes automatically.
+- **MCP server** runs in-process via memory pipes (no network hop), keeping tool-call latency minimal. It is registered as a Singleton to share a single server/client pair across concurrent requests.
+- **Ingestion** batches all embeddings in a single `GenerateAsync` call. For significantly larger datasets, this could be partitioned into fixed-size batches to bound memory usage.
+- **DeepSeek API** is the main external bottleneck — response latency depends on token count and upstream load. The agent is ephemeral per request, so concurrent `/ask` calls are independent.
+
 ## Key Dependencies
 
 | Package | Purpose |

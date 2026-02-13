@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
@@ -33,7 +34,7 @@ public class ParkAssistantAgent
         _logger = logger;
     }
 
-    public async Task<string> AskAsync(string question)
+    public async Task<string> AskAsync(string question, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Agent processing question: {Question}", question);
 
@@ -62,16 +63,16 @@ public class ParkAssistantAgent
             })
         };
 
-        var response = string.Empty;
+        var response = new StringBuilder();
 
         await foreach (var message in agent.InvokeAsync(
-            new ChatMessageContent(AuthorRole.User, question)))
+            new ChatMessageContent(AuthorRole.User, question), cancellationToken: cancellationToken))
         {
-            response += message.Message.Content;
+            response.Append(message.Message.Content);
         }
 
         _logger.LogInformation("Agent completed response");
-        return response;
+        return response.ToString();
     }
 
     /// <summary>Logs MCP tool calls and results in the request context where ILogger output is visible.</summary>

@@ -36,53 +36,68 @@ public class IngestFunction
 
         if (documents.Count == 0)
         {
-            return new BadRequestObjectResult(new { error = "No documents found to ingest." });
+            return new BadRequestObjectResult(new ErrorResponse("No documents found to ingest."));
         }
 
         _logger.LogInformation("Processing {Count} documents for ingestion", documents.Count);
 
-        // Ensure the Qdrant collection exists
-        await _vectorStoreService.CreateCollectionIfNotExistsAsync(cancellationToken);
-
-        // Parse each document and extract the description for embedding
-        var parkData = new List<(string ParkCode, string ParkName, string State, string Content, string Description)>();
-
-        foreach (var (fileName, content) in documents)
+        try
         {
-            var parkCode = Path.GetFileNameWithoutExtension(fileName);
-            var lines = content.Split('\n', StringSplitOptions.None);
+            // Ensure the Qdrant collection exists
+            await _vectorStoreService.CreateCollectionIfNotExistsAsync(cancellationToken);
 
-            if (lines.Length < 2)
+            // Parse each document and extract the description for embedding
+            var parkData = new List<(string ParkCode, string ParkName, string State, string Content, string Description)>();
+
+            foreach (var (fileName, content) in documents)
             {
-                _logger.LogWarning("Skipping {File}: insufficient content", fileName);
-                continue;
+                var parkCode = Path.GetFileNameWithoutExtension(fileName);
+                var lines = content.Split('\n', StringSplitOptions.None);
+
+                if (lines.Length < 2)
+                {
+                    _logger.LogWarning("Skipping {File}: insufficient content", fileName);
+                    continue;
+                }
+
+                var parkName = lines[0].Trim();
+                var state = lines.Length > 1 ? lines[1].Replace("State(s):", "").Trim() : "Unknown";
+                var description = ExtractDescription(content);
+
+                parkData.Add((parkCode, parkName, state, content, description));
             }
 
-            var parkName = lines[0].Trim();
-            var state = lines.Length > 1 ? lines[1].Replace("State(s):", "").Trim() : "Unknown";
-            var description = ExtractDescription(content);
+            if (parkData.Count == 0)
+            {
+                return new BadRequestObjectResult(new ErrorResponse("No valid documents to ingest after parsing."));
+            }
 
-            parkData.Add((parkCode, parkName, state, content, description));
+            // Generate embeddings for all descriptions in one batch
+            var descriptions = parkData.Select(p => p.Description).ToList();
+            var embeddings = await _embeddingGenerator.GenerateAsync(descriptions, cancellationToken: cancellationToken);
+
+            // Pair parks with their embeddings and upsert
+            var parksWithEmbeddings = parkData.Zip(embeddings, (park, embedding) =>
+                (park.ParkCode, park.ParkName, park.State, park.Content, (ReadOnlyMemory<float>)embedding.Vector));
+
+            await _vectorStoreService.UpsertParksAsync(parksWithEmbeddings, cancellationToken);
+
+            _logger.LogInformation("Successfully ingested {Count} parks", parkData.Count);
+
+            return new OkObjectResult(new { message = $"Successfully ingested {parkData.Count} parks.", count = parkData.Count });
         }
-
-        if (parkData.Count == 0)
+        catch (OperationCanceledException)
         {
-            return new BadRequestObjectResult(new { error = "No valid documents to ingest after parsing." });
+            throw;
         }
-
-        // Generate embeddings for all descriptions in one batch
-        var descriptions = parkData.Select(p => p.Description).ToList();
-        var embeddings = await _embeddingGenerator.GenerateAsync(descriptions, cancellationToken: cancellationToken);
-
-        // Pair parks with their embeddings and upsert
-        var parksWithEmbeddings = parkData.Zip(embeddings, (park, embedding) =>
-            (park.ParkCode, park.ParkName, park.State, park.Content, (ReadOnlyMemory<float>)embedding.Vector));
-
-        await _vectorStoreService.UpsertParksAsync(parksWithEmbeddings, cancellationToken);
-
-        _logger.LogInformation("Successfully ingested {Count} parks", parkData.Count);
-
-        return new OkObjectResult(new { message = $"Successfully ingested {parkData.Count} parks.", count = parkData.Count });
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to ingest documents");
+            return new ObjectResult(new ErrorResponse("An error occurred during ingestion."))
+            {
+                StatusCode = StatusCodes.Status500InternalServerError
+            };
+        }
     }
 
     private async Task<List<(string FileName, string Content)>> GetDocumentsAsync(

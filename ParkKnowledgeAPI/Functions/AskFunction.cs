@@ -20,20 +20,36 @@ public class AskFunction
 
     [Function("Ask")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ask")] HttpRequest req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ask")] HttpRequest req,
+        CancellationToken cancellationToken)
     {
-        var body = await req.ReadFromJsonAsync<AskRequest>();
+        var body = await req.ReadFromJsonAsync<AskRequest>(cancellationToken);
 
         if (body is null || string.IsNullOrWhiteSpace(body.Question))
         {
             _logger.LogWarning("Received ask request with empty question");
-            return new BadRequestObjectResult(new { error = "Question is required." });
+            return new BadRequestObjectResult(new ErrorResponse("Question is required."));
         }
 
         _logger.LogInformation("Ask endpoint called with question: {Question}", body.Question);
 
-        var answer = await _agent.AskAsync(body.Question);
+        try
+        {
+            var answer = await _agent.AskAsync(body.Question, cancellationToken);
 
-        return new OkObjectResult(new AskResponse { Answer = answer });
+            return new OkObjectResult(new AskResponse { Answer = answer });
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // Let the runtime handle client disconnects
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process question: {Question}", body.Question);
+            return new ObjectResult(new ErrorResponse("An error occurred while processing your question."))
+            {
+                StatusCode = StatusCodes.Status500InternalServerError
+            };
+        }
     }
 }

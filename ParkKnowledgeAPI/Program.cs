@@ -32,8 +32,10 @@ var onnxModelPath = Path.Combine(AppContext.BaseDirectory, "Models", "onnx", "mo
 var vocabPath = Path.Combine(AppContext.BaseDirectory, "Models", "onnx", "vocab.txt");
 builder.Services.AddBertOnnxEmbeddingGenerator(onnxModelPath, vocabPath);
 
-// Qdrant client
-builder.Services.AddSingleton(new QdrantClient("localhost", 6334));
+// Qdrant client — reads host and gRPC port from configuration
+builder.Services.AddSingleton(_ => new QdrantClient(
+    host: builder.Configuration["Qdrant:Host"] ?? "localhost",
+    port: int.Parse(builder.Configuration["Qdrant:GrpcPort"] ?? "6334")));
 
 // Vector store
 builder.Services.AddSingleton<IVectorStoreService, QdrantVectorStoreService>();
