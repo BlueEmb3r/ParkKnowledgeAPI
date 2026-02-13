@@ -18,6 +18,31 @@ docker compose up -d
 
 The API will be available at `http://localhost:7071/api/`.
 
+## GET /health
+
+**Check all modules:**
+```bash
+curl -s http://localhost:7071/api/health
+```
+
+```powershell
+curl.exe -s http://localhost:7071/api/health
+```
+
+Expected (all healthy):
+```json
+{
+  "status": "healthy",
+  "modules": {
+    "qdrant": { "status": "healthy", "details": "1 collection(s)" },
+    "deepSeek": { "status": "healthy", "details": "model=deepseek-chat, endpoint=https://api.deepseek.com" },
+    "onnxEmbedding": { "status": "healthy", "details": "model.onnx=86MB" }
+  }
+}
+```
+
+When a module is down, `status` changes to `"degraded"` and the failing module shows `"unhealthy"` with an error message.
+
 ## POST /ask
 
 **Success:**
