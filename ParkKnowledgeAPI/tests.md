@@ -16,17 +16,17 @@ Ensure Qdrant is running (needed for `/ingest`):
 docker compose up -d
 ```
 
-The API will be available at `http://localhost:7071/api/`.
+The API will be available at `http://localhost:7071/api/v1/`.
 
 ## GET /health
 
 **Check all modules:**
 ```bash
-curl -s http://localhost:7071/api/health
+curl -s http://localhost:7071/api/v1/health
 ```
 
 ```powershell
-curl.exe -s http://localhost:7071/api/health
+curl.exe -s http://localhost:7071/api/v1/health
 ```
 
 Expected (all healthy):
@@ -49,11 +49,11 @@ The ask endpoint uses RAG — it calls the `search_parks` MCP tool to query Qdra
 
 **RAG query (after ingesting):**
 ```bash
-curl -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d "{\"question\": \"What can you tell me about Mount Rainier?\"}"
+curl -s -X POST http://localhost:7071/api/v1/ask -H "Content-Type: application/json" -d "{\"question\": \"What can you tell me about Mount Rainier?\"}"
 ```
 
 ```powershell
-curl.exe -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d '{"question": "What can you tell me about Mount Rainier?"}'
+curl.exe -s -X POST http://localhost:7071/api/v1/ask -H "Content-Type: application/json" -d '{"question": "What can you tell me about Mount Rainier?"}'
 ```
 
 Expected: Response should reference Mount Rainier National Park with specific details from the ingested data, such as:
@@ -66,20 +66,20 @@ Expected: Response should reference Mount Rainier National Park with specific de
 
 **General question:**
 ```bash
-curl -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d "{\"question\": \"What is Yellowstone known for?\"}"
+curl -s -X POST http://localhost:7071/api/v1/ask -H "Content-Type: application/json" -d "{\"question\": \"What is Yellowstone known for?\"}"
 ```
 
 ```powershell
-curl.exe -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d '{"question": "What is Yellowstone known for?"}'
+curl.exe -s -X POST http://localhost:7071/api/v1/ask -H "Content-Type: application/json" -d '{"question": "What is Yellowstone known for?"}'
 ```
 
 **Validation (empty question):**
 ```bash
-curl -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d "{\"question\": \"\"}"
+curl -s -X POST http://localhost:7071/api/v1/ask -H "Content-Type: application/json" -d "{\"question\": \"\"}"
 ```
 
 ```powershell
-curl.exe -s -X POST http://localhost:7071/api/ask -H "Content-Type: application/json" -d '{"question": ""}'
+curl.exe -s -X POST http://localhost:7071/api/v1/ask -H "Content-Type: application/json" -d '{"question": ""}'
 ```
 
 Expected: `{"error":"Question is required."}`
@@ -88,22 +88,22 @@ Expected: `{"error":"Question is required."}`
 
 **Ingest all parks from local files (no body):**
 ```bash
-curl -s -X POST http://localhost:7071/api/ingest
+curl -s -X POST http://localhost:7071/api/v1/ingest
 ```
 
 ```powershell
-curl.exe -s -X POST http://localhost:7071/api/ingest
+curl.exe -s -X POST http://localhost:7071/api/v1/ingest
 ```
 
 Expected: `{"message":"Successfully ingested 474 parks.","count":474}`
 
 **Ingest specific documents (with body):**
 ```bash
-curl -s -X POST http://localhost:7071/api/ingest -H "Content-Type: application/json" -d "{\"documents\": [{\"fileName\": \"test.txt\", \"content\": \"Test Park\nState(s): CA\n\nDescription:\nA test park for verification.\n\nDirections:\nNone.\"}]}"
+curl -s -X POST http://localhost:7071/api/v1/ingest -H "Content-Type: application/json" -d "{\"documents\": [{\"fileName\": \"test.txt\", \"content\": \"Test Park\nState(s): CA\n\nDescription:\nA test park for verification.\n\nDirections:\nNone.\"}]}"
 ```
 
 ```powershell
-curl.exe -s -X POST http://localhost:7071/api/ingest -H "Content-Type: application/json" -d '{"documents": [{"fileName": "test.txt", "content": "Test Park\nState(s): CA\n\nDescription:\nA test park for verification.\n\nDirections:\nNone."}]}'
+curl.exe -s -X POST http://localhost:7071/api/v1/ingest -H "Content-Type: application/json" -d '{"documents": [{"fileName": "test.txt", "content": "Test Park\nState(s): CA\n\nDescription:\nA test park for verification.\n\nDirections:\nNone."}]}'
 ```
 
 Expected: `{"message":"Successfully ingested 1 parks.","count":1}`

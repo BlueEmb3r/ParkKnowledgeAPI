@@ -20,7 +20,7 @@ public class AskStreamFunction
 
     [Function("AskStream")]
     public async Task Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ask/stream")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/ask/stream")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         var body = await req.ReadFromJsonAsync<AskRequest>(cancellationToken);

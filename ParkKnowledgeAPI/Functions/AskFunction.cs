@@ -20,7 +20,7 @@ public class AskFunction
 
     [Function("Ask")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ask")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/ask")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         var body = await req.ReadFromJsonAsync<AskRequest>(cancellationToken);

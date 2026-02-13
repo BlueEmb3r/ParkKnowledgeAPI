@@ -26,7 +26,7 @@ public class IngestFunction
 
     [Function("Ingest")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ingest")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/ingest")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Ingest endpoint called");
@@ -84,7 +84,7 @@ public class IngestFunction
 
             _logger.LogInformation("Successfully ingested {Count} parks", parkData.Count);
 
-            return new OkObjectResult(new { message = $"Successfully ingested {parkData.Count} parks.", count = parkData.Count });
+            return new OkObjectResult(new IngestResponse($"Successfully ingested {parkData.Count} parks.", parkData.Count));
         }
         catch (OperationCanceledException)
         {

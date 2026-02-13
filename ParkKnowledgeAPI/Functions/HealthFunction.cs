@@ -22,7 +22,7 @@ public class HealthFunction
 
     [Function("Health")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")] HttpRequest req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/health")] HttpRequest req)
     {
         var qdrantCheck = await CheckQdrantAsync();
         var deepSeekCheck = CheckDeepSeek();
