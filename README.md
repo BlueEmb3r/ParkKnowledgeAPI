@@ -84,10 +84,10 @@ graph TB
         VSVC["VectorStoreService<br/>(Qdrant)"]
     end
 
-    subgraph EXTERNAL["External Services"]
+    %% subgraph EXTERNAL["External Services"]
         QDRANT[("Qdrant<br/>(Docker)")]
         DS["DeepSeek API<br/>(deepseek-chat)"]
-    end
+    %% end
 
     %% Ingestion flow
     REQ --> INGEST
@@ -109,6 +109,7 @@ graph TB
     REQ --> HEALTH
     HEALTH -.->|ping| QDRANT
     HEALTH -.->|ping| EMBED
+    HEALTH -.->|ping| DS
 
     %% Styling
     classDef funcStyle fill:#4A90D9,stroke:#2C5F8A,color:#fff
