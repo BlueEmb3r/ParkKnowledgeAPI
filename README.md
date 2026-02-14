@@ -54,6 +54,78 @@ ParkKnowledgeAPI/
 docker-compose.yml     # Qdrant vector database
 ```
 
+## Architecture Diagram
+
+```mermaid
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+graph TB
+    subgraph CLIENT["Client"]
+        REQ["HTTP Request"]
+    end
+
+    subgraph AF["Azure Functions v4 (.NET 9)"]
+        INGEST["POST /ingest"]
+        ASK["POST /ask"]
+        HEALTH["GET /health"]
+    end
+
+    subgraph SK["Semantic Kernel (Orchestration)"]
+        AGENT["ChatCompletionAgent"]
+        MCPC["MCP Client Plugin"]
+        DSCN["DeepSeek Connector<br/>(OpenAI-compatible)"]
+    end
+
+    subgraph MCP["MCP Server (MCP C# SDK)"]
+        SEARCH["search_parks(query)"]
+    end
+
+    subgraph SERVICES["Service Layer"]
+        EMBED["EmbeddingGenerator<br/>(all-MiniLM-L6-v2 ONNX)"]
+        VSVC["VectorStoreService<br/>(Qdrant)"]
+    end
+
+    subgraph EXTERNAL["External Services"]
+        QDRANT[("Qdrant<br/>(Docker)")]
+        DS["DeepSeek API<br/>(deepseek-chat)"]
+    end
+
+    %% Ingestion flow
+    REQ --> INGEST
+    INGEST --> EMBED
+    EMBED --> |ingest| VSVC
+    VSVC --> QDRANT
+
+    %% Ask flow
+    REQ --> ASK
+    ASK --> AGENT
+    AGENT --> MCPC
+    MCPC --> SEARCH
+    SEARCH --> EMBED
+    EMBED --> |query| VSVC
+    AGENT --> DSCN
+    DSCN --> DS
+
+    %% Health flow
+    REQ --> HEALTH
+    HEALTH -.->|ping| QDRANT
+    HEALTH -.->|ping| EMBED
+
+    %% Styling
+    classDef funcStyle fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    classDef skStyle fill:#6B4C9A,stroke:#4A3470,color:#fff
+    classDef mcpStyle fill:#D4853B,stroke:#A6642A,color:#fff
+    classDef svcStyle fill:#3A8F6E,stroke:#2A6B52,color:#fff
+    classDef extStyle fill:#C0392B,stroke:#922B21,color:#fff
+    classDef clientStyle fill:#555,stroke:#333,color:#fff
+
+    class INGEST,ASK,HEALTH funcStyle
+    class AGENT,MCPC,DSCN skStyle
+    class SEARCH mcpStyle
+    class EMBED,CHUNK,VSVC svcStyle
+    class QDRANT,DS extStyle
+    class REQ clientStyle
+```
+
 ## Design Decisions
 
 ### One vector per park, no chunking
