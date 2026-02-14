@@ -129,19 +129,31 @@ graph TB
 
 ## Design Decisions
 
-### One vector per park, no chunking
+### 474 parks from the NPS API
 
-The embedding model (all-MiniLM-L6-v2) has a 256-token context window. We only embed the **Description** section of each park file, which is 36-67 words across the dataset -- well within that limit. There is no text to split, so chunking and overlap logic would be dead code.
-
-The full file content (directions, weather, hours) is stored as payload in Qdrant and returned to the LLM at query time, so no information is lost.
+The assessment suggests picking several park pages manually. Instead, a C# script (`ScrapeNpsParks.csx`) queries the NPS API for **all 474 parks**, collecting name, state, description, directions, operating hours, and weather into structured `.txt` files. This gives the RAG system a complete knowledge base rather than a hand-picked sample.
 
 ### Embed description, store everything
 
 Descriptions are the most **semantically meaningful** section for similarity search — a user asking "parks with glaciers" should match on description content, not driving directions or weather. Embedding the full file would dilute the signal with boilerplate (operating hours, route numbers) that adds noise to cosine similarity.
 
+The full file content (directions, weather, hours) is stored as payload in Qdrant and returned to the LLM at query time, so no information is lost.
+
+### One vector per park, no chunking
+
+The embedding model (all-MiniLM-L6-v2) has a 256-token context window. Park descriptions are 36-67 words across the dataset — well within that limit. There is no text to split, so chunking and overlap logic would be dead code.
+
 ### No custom embedding wrapper
 
 `Microsoft.SemanticKernel.Connectors.Onnx` provides `BertOnnxTextEmbeddingGenerationService` which handles tokenization, ONNX inference, mean pooling, and L2 normalization internally. Wrapping it in a custom `IEmbeddingService` would add indirection with no benefit — the SK `IEmbeddingGenerator<string, Embedding<float>>` interface is injected directly where needed.
+
+### Deterministic point IDs
+
+Each park code is hashed (MD5 → GUID) to produce a **stable Qdrant point ID**. Re-running `/ingest` upserts the same points instead of creating duplicates, making ingestion idempotent.
+
+### Temperature 0 + required tool use
+
+The agent is configured with `temperature: 0.0` and `FunctionChoiceBehavior.Required()`. The LLM **must** call `search_parks` before answering — it cannot skip retrieval and hallucinate from parametric knowledge. Temperature 0 ensures deterministic, reproducible answers for the same query.
 
 ### Streaming endpoint (`/api/v1/ask/stream`)
 
