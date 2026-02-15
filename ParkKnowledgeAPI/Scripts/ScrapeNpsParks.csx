@@ -10,7 +10,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-var apiKey = "REMOVED_KEY";
+var apiKey = Environment.GetEnvironmentVariable("NPS_API_KEY")
+    ?? throw new InvalidOperationException("NPS_API_KEY environment variable is not set. Get a key at https://developer.nps.gov/signup/");
 var outputDir = Path.Combine(AppContext.BaseDirectory, "..", "Data", "parks");
 
 // Resolve output path relative to the script's location if running via dotnet-script

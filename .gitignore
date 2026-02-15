@@ -1,5 +1,6 @@
 .vscode
 .env
+local.settings.json
 
 # ONNX model files (large binaries)
 *.onnx

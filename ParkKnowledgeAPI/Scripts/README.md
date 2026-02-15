@@ -29,4 +29,4 @@ Output goes to `ParkKnowledgeAPI/Data/parks/` (474 park files).
 
 ## API Key
 
-The NPS API key is hardcoded in the script. If it expires, get a new one at https://developer.nps.gov/signup/ and replace the `apiKey` variable.
+The script reads the NPS API key from the `NPS_API_KEY` environment variable. Get a key at https://developer.nps.gov/signup/ and set it before running.

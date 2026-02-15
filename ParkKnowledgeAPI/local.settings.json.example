@@ -4,11 +4,11 @@
         "AzureWebJobsStorage": "UseDevelopmentStorage=true",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
         "DeepSeek__Endpoint": "https://api.deepseek.com",
-        "DeepSeek__ApiKey": "REMOVED_KEY",
+        "DeepSeek__ApiKey": "",
         "DeepSeek__ModelId": "deepseek-chat",
         "Qdrant__Host": "localhost",
         "Qdrant__Port": "6333",
         "Qdrant__GrpcPort": "6334",
-        "NPS__ApiKey": "REMOVED_KEY"
+        "NPS__ApiKey": ""
     }
 }
