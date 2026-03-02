@@ -1,6 +1,16 @@
 # ParkKnowledgeAPI
 
-Azure Functions v4 API powered by Semantic Kernel, Qdrant vector search, and local ONNX embeddings for national park information.
+A production-style **Retrieval-Augmented Generation (RAG) API** built on Azure Functions v4, demonstrating end-to-end system design — from automated data ingestion and local ONNX embeddings to vector search and LLM-powered answers with streaming support.
+
+## What This Project Demonstrates
+
+- **RAG pipeline from scratch** — ingestion, embedding, vector storage, retrieval, and generation with no managed RAG services
+- **Semantic Kernel orchestration** — ChatCompletionAgent with required tool use, ensuring the LLM always grounds answers in retrieved context
+- **Model Context Protocol (MCP)** — in-process MCP server exposing retrieval as a tool, bridging the agent framework with the service layer
+- **Local inference** — ONNX-based embedding (all-MiniLM-L6-v2) running in-process, no external embedding API calls
+- **Streaming SSE endpoint** — real-time token delivery following OpenAI's SSE convention, alongside a buffered JSON endpoint
+- **Automated data pipeline** — C# script that scrapes all 474 US national parks from the NPS API, producing a complete knowledge base
+- **Clean layered architecture** — clear separation between HTTP triggers, orchestration, services, and external dependencies
 
 ## Prerequisites
 
@@ -21,19 +31,43 @@ Azure Functions v4 API powered by Semantic Kernel, Qdrant vector search, and loc
    ```
    > On Windows PowerShell, use `curl.exe` instead of `curl`.
 
-3. **Build**
+3. **Configure environment** — copy the example settings and add your API keys:
+   ```
+   cp ParkKnowledgeAPI/local.settings.json.example ParkKnowledgeAPI/local.settings.json
+   ```
+   Then fill in `DeepSeek__ApiKey` (and optionally `Nps__ApiKey` if re-scraping park data).
+
+4. **Build**
    ```
    cd ParkKnowledgeAPI
    dotnet build
    ```
 
-4. **Run**
+5. **Run**
    ```
    cd ParkKnowledgeAPI
    func start
    ```
 
-> `local.settings.json` is committed with the shared DeepSeek API key provided for this assessment — no configuration needed.
+## API Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/v1/ask` | POST | Ask a question — returns a buffered JSON response with the LLM's answer |
+| `/api/v1/ask/stream` | POST | Ask a question — streams tokens via Server-Sent Events |
+| `/api/v1/ingest` | POST | Ingest park data into the vector store (embeds and upserts all parks) |
+| `/api/v1/health` | GET | Health check — pings Qdrant, embedding model, and DeepSeek |
+
+**Example:**
+```bash
+# Ingest the knowledge base
+curl -X POST http://localhost:7071/api/v1/ingest
+
+# Ask a question
+curl -X POST http://localhost:7071/api/v1/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which parks have glaciers?"}'
+```
 
 ## Project Structure
 
@@ -47,14 +81,14 @@ ParkKnowledgeAPI/
   Mcp/                 # Model Context Protocol server/tools
   Orchestration/       # Semantic Kernel agent orchestration
   Data/
-    parks/             # Park knowledge base source files
+    parks/             # Park knowledge base source files (474 parks)
+  Scripts/             # Data scraping scripts (NPS API)
   Program.cs           # App startup and DI configuration
   host.json            # Azure Functions host config
-  local.settings.json  # Local environment variables (committed for assessment)
 docker-compose.yml     # Qdrant vector database
 ```
 
-## Architecture Diagram
+## Architecture
 
 ```mermaid
 %%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
@@ -129,9 +163,9 @@ graph TB
 
 ## Design Decisions
 
-### 474 parks from the NPS API
+### Automated data ingestion over hand-picked samples
 
-The assessment suggests picking several park pages manually. Instead, a C# script (`ScrapeNpsParks.csx`) queries the NPS API for **all 474 parks**, collecting name, state, description, directions, operating hours, and weather into structured `.txt` files. This gives the RAG system a complete knowledge base rather than a hand-picked sample.
+Rather than manually selecting a handful of park pages, a C# script (`ScrapeNpsParks.csx`) queries the NPS API for **all 474 parks**, collecting name, state, description, directions, operating hours, and weather into structured `.txt` files. This gives the RAG system a realistic, complete knowledge base — the kind of automated pipeline you'd build in production.
 
 ### Embed description, store everything
 
@@ -141,7 +175,7 @@ The full file content (directions, weather, hours) is stored as payload in Qdran
 
 ### One vector per park, no chunking
 
-The embedding model (all-MiniLM-L6-v2) has a 256-token context window. Park descriptions are 36-67 words across the dataset — well within that limit. There is no text to split, so chunking and overlap logic would be dead code.
+The embedding model (all-MiniLM-L6-v2) has a 256-token context window. Park descriptions are 36–67 words across the dataset — well within that limit. There is no text to split, so chunking and overlap logic would be dead code. The architecture supports chunking if the data ever required it, but adding it here would be premature abstraction.
 
 ### No custom embedding wrapper
 
@@ -170,7 +204,7 @@ data: {"content":" world"}
 data: [DONE]
 ```
 
-**Why it's structured this way:**
+**Implementation details:**
 - `ParkAssistantAgent.BuildAgent()` is shared between `AskAsync` and `AskStreamingAsync` — kernel cloning, MCP tool injection, and agent construction live in one place.
 - The orchestration layer returns `IAsyncEnumerable<string>`, keeping SSE/HTTP concerns out of business logic.
 - The function writes directly to `HttpResponse` (returns `Task`, not `IActionResult`) because once streaming headers are sent, the status code is committed and can't change via an action result.
@@ -184,13 +218,15 @@ data: [DONE]
 - **Ingestion** batches all embeddings in a single `GenerateAsync` call. For significantly larger datasets, this could be partitioned into fixed-size batches to bound memory usage.
 - **DeepSeek API** is the main external bottleneck — response latency depends on token count and upstream load. The agent is ephemeral per request, so concurrent `/ask` calls are independent.
 
-## Key Dependencies
+## Tech Stack
 
-| Package | Purpose |
-|---|---|
-| Microsoft.SemanticKernel | LLM orchestration and plugin system |
-| Microsoft.SemanticKernel.Agents.Core | ChatCompletionAgent for single-agent orchestration |
-| Microsoft.SemanticKernel.Connectors.OpenAI | OpenAI-compatible LLM connector (DeepSeek) |
-| ModelContextProtocol | MCP server for tool exposure |
-| Qdrant.Client | Vector database client |
-| Microsoft.ML.OnnxRuntime | Local embedding generation (all-MiniLM-L6-v2) |
+| Component | Technology | Purpose |
+|---|---|---|
+| Runtime | .NET 9 / Azure Functions v4 (isolated) | Serverless API hosting |
+| LLM Orchestration | Microsoft Semantic Kernel | Agent framework, plugin system, prompt management |
+| Agent | ChatCompletionAgent | Single-agent orchestration with required tool calling |
+| LLM | DeepSeek (via OpenAI-compatible connector) | Natural language generation |
+| Embeddings | all-MiniLM-L6-v2 (ONNX, local) | Semantic similarity for retrieval |
+| Vector Store | Qdrant (Docker) | Similarity search and metadata storage |
+| Tool Protocol | Model Context Protocol (MCP) | Exposing retrieval as an agent-callable tool |
+| Data Source | NPS API (474 parks) | Automated knowledge base construction |
